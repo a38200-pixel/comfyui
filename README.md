@@ -1,6 +1,6 @@
 # ComfyUI Studio: 텍스트로 이미지를 만드는 웹 앱
 
-> 프롬프트를 입력하면 **ComfyUI API**로 Stable Diffusion(SDXL Turbo) 워크플로를 실행하고, 생성된 이미지를 웹에서 바로 보여주는 Flask 애플리케이션입니다.
+> 프롬프트를 입력하면 **원격 GPU PC의 ComfyUI API**로 이미지 생성 워크플로(Flux.2 Klein / SDXL Turbo)를 실행하고, 생성된 이미지를 웹에서 바로 보여주는 Flask 애플리케이션입니다.
 
 <!-- 스크린샷: docs/images/screenshot.png 파일을 추가하면 아래에 표시됩니다 -->
 ![ComfyUI Studio 화면](docs/images/screenshot.png)
@@ -13,17 +13,21 @@
 | --- | --- |
 | 목적 | ComfyUI의 노드 기반 워크플로를 **누구나 쓸 수 있는 웹 UI**로 감싸기 |
 | 기능 | Positive/Negative 프롬프트 입력 → 이미지 생성 → 결과 표시 |
-| 모델 | SDXL Turbo (`sd_xl_turbo_1.0_fp16`, 1-step 샘플링) |
+| 모델 | **Flux.2 Klein 4B** (1024×1024, 20스텝, 현재 기본) / SDXL Turbo (512×512, 1스텝) |
+| 구성 | 웹 앱(VM, GPU 없음)과 추론 서버(원격 GPU PC의 ComfyUI)를 분리 |
 | 배포 | Docker 개발 환경 → 학교 VMware 서버(Linux)에 배포 |
 
 ComfyUI는 강력하지만 노드 그래프 화면이 복잡해서 처음 쓰는 사람이 다루기 어렵습니다.
 이 프로젝트는 ComfyUI에서 만든 워크플로를 **API 형식 JSON**으로 저장해 두고, 웹에서는 프롬프트만 입력하면 되도록 만들었습니다.
+워크플로 JSON만 바꾸면 다른 모델로 교체할 수 있어서, SDXL Turbo로 시작해 **다른 PC의 ComfyUI 서버에서 받은 Flux.2 워크플로**로 확장했습니다.
 
 <br>
 
 ## 주요 기능
 
 - **텍스트 → 이미지 생성**: Positive / Negative 프롬프트로 이미지 생성
+- **원격 추론 서버 연동**: 같은 네트워크의 다른 GPU PC에서 돌아가는 ComfyUI로 생성 요청
+- **워크플로 교체**: ComfyUI에서 내보낸 API 형식 JSON(`flux2.json`, `test.json`)으로 모델 전환
 - **매번 다른 결과**: 요청마다 시드를 랜덤으로 바꿔 같은 프롬프트로도 새로운 이미지 생성
 - **생성 상태 표시**: 생성 중에는 버튼 비활성화, 스피너, 결과 영역 애니메이션
 - **다크 UI**: 다크 베이스에 네온 그린 포인트, 모바일 반응형 레이아웃
@@ -37,8 +41,8 @@ ComfyUI는 강력하지만 노드 그래프 화면이 복잡해서 처음 쓰는
 ```mermaid
 sequenceDiagram
     participant B as 브라우저
-    participant F as Flask 서버<br/>(Docker / VM)
-    participant C as ComfyUI 서버<br/>(GPU PC)
+    participant F as Flask 서버<br/>(Docker / VM, GPU 없음)
+    participant C as ComfyUI 추론 서버<br/>(원격 GPU PC)
 
     B->>F: POST / (pos, neg)
     F->>F: 워크플로 JSON 로드<br/>프롬프트·시드 주입
@@ -56,8 +60,8 @@ sequenceDiagram
 | 구성 요소 | 역할 |
 | --- | --- |
 | **Flask** (`app2.py`) | 워크플로에 프롬프트를 주입하고 ComfyUI에 제출, 완료될 때까지 폴링 |
-| **ComfyUI** | 실제 이미지 생성 (GPU) |
-| **워크플로** (`static/test.json`) | ComfyUI에서 설계한 노드 그래프 (API 형식) |
+| **ComfyUI** | 실제 이미지 생성 (원격 PC의 GPU) |
+| **워크플로** (`static/flux2.json`, `static/test.json`) | ComfyUI에서 설계한 노드 그래프 (API 형식) |
 | **템플릿** (`templates/image.html`) | 입력 폼과 결과 화면 |
 
 <br>
@@ -67,7 +71,7 @@ sequenceDiagram
 | 분류 | 사용 기술 |
 | --- | --- |
 | Backend | Python 3.12, Flask, requests |
-| AI / 이미지 생성 | ComfyUI, Stable Diffusion XL Turbo |
+| AI / 이미지 생성 | ComfyUI, Flux.2 Klein 4B, Stable Diffusion XL Turbo |
 | Frontend | HTML, CSS, Vanilla JS (Jinja2 템플릿, 외부 라이브러리 없음) |
 | Infra | Docker, Docker Compose, VMware (Linux VM), SSH / scp |
 
@@ -80,14 +84,25 @@ sequenceDiagram
 ### 1. 워크플로 재사용과 프롬프트 주입
 
 ComfyUI에서 저장한 API 형식 JSON을 불러와 노드 ID로 필요한 값만 바꿉니다.
+아래는 Flux.2 워크플로 기준입니다. 프롬프트 텍스트 노드(`PrimitiveStringMultiline`)는 입력 이름이 `text`가 아니라 `value`입니다.
 
 ```python
-def update_prompts(graph, pos, neg, pos_node_id="6", neg_node_id="7"):
-    graph["13"]["inputs"]["noise_seed"] = random.randint(0, 2**32 - 1)  # 시드 랜덤화
-    graph[pos_node_id]["inputs"]["text"] = pos
+def update_prompts(graph, pos, neg, pos_node_id="76", neg_node_id="75:67"):
+    graph["75:73"]["inputs"]["noise_seed"] = random.randint(0, 2**32 - 1)  # 시드 랜덤화
+    graph[pos_node_id]["inputs"]["value"] = pos
     graph[neg_node_id]["inputs"]["text"] = neg
     return graph
 ```
+
+워크플로마다 노드 번호와 입력 이름이 다르기 때문에, 워크플로를 바꿀 때는 JSON을 분석해서 이 값들을 맞춰야 합니다.
+
+| 역할 | SDXL Turbo (`test.json`) | Flux.2 Klein (`flux2.json`) |
+| --- | --- | --- |
+| Positive | `"6"` → `text` | `"76"` → `value` |
+| Negative | `"7"` → `text` | `"75:67"` → `text` |
+| 시드 | `"13"` → `noise_seed` | `"75:73"` → `noise_seed` |
+
+분석 과정은 [Flux.2 원격 추론 문서](docs/flux2-remote-inference.md#4-워크플로-분석-바꿀-노드-찾기)에 정리했습니다.
 
 ### 2. 비동기 작업의 완료 대기 (폴링)
 
@@ -108,6 +123,9 @@ while time.time() < end:
 | --- | --- | --- |
 | `COMFY_URL` | Flask 서버가 API 호출 | `http://host.docker.internal:8188` |
 | `PUBLIC_COMFY_URL` | 브라우저가 이미지 로드 | `http://192.168.0.10:8188` |
+| `WORKFLOW_PATH` | 사용할 워크플로 | `./static/flux2.json` |
+
+원격 ComfyUI를 쓸 때는 VM의 Flask와 내 PC의 브라우저가 모두 같은 주소로 ComfyUI에 접속하므로 `COMFY_URL`과 `PUBLIC_COMFY_URL`이 같아집니다.
 
 <br>
 
@@ -127,6 +145,18 @@ while time.time() < end:
 - **원인**: 워크플로 JSON의 `noise_seed`가 고정값으로 저장되어 있었습니다. 또 ComfyUI는 입력이 같으면 캐시된 결과를 재사용합니다.
 - **해결**: 요청마다 `random.randint()`로 시드를 바꾸도록 했습니다.
 
+### 워크플로를 Flux.2로 바꾸자 노드를 찾지 못함
+
+- **문제**: 워크플로 파일만 `flux2.json`으로 바꾸면 `KeyError: '13'`이 나는 상태였습니다.
+- **원인**: 코드가 SDXL 워크플로의 노드 번호(`6`, `7`, `13`)를 고정해서 쓰고 있었습니다. Flux.2 워크플로는 서브그래프 안의 노드라 `75:73` 같은 ID를 쓰고, 프롬프트 입력 이름도 `value`로 달랐습니다.
+- **해결**: JSON의 노드 연결(`CFGGuider`의 positive/negative 입력)을 따라가서 바꿀 노드를 찾고 코드에 반영했습니다.
+
+### 응답은 정상(200)인데 이미지가 나오지 않음
+
+- **원인**: Flux.2는 한 장에 약 35초 걸리는데, ComfyUI 큐에 작업이 4개 쌓여 있어서 내 작업 차례가 오기 전에 폴링 제한 시간(60초)이 지났습니다. 오류가 아니라 시간 초과라서 로그는 `200`이었습니다.
+- **확인**: ComfyUI의 `/queue`, `/history` API를 직접 조회해서 생성은 모두 성공했고 대기 시간이 문제라는 것을 확인했습니다.
+- **해결**: 큐가 빈 상태에서 다시 요청해 정상 생성을 확인했습니다. 제한 시간 연장과 시간 초과 안내는 개선 과제로 남겼습니다.
+
 ### 다른 PC에서 clone하면 실행되지 않음
 
 - **원인**: ComfyUI의 IP가 코드에 하드코딩되어 있었고, Docker 실행 환경(이미지, 포트)이 저장소에 없었습니다.
@@ -136,7 +166,9 @@ while time.time() < end:
 
 ## 빠른 시작
 
-> 사전 준비: NVIDIA GPU PC에 **ComfyUI 설치와 SDXL Turbo 모델**이 필요합니다. [설치 가이드](docs/README.md#1-comfyui-설치와-모델-다운로드)를 참고하세요.
+> 사전 준비: NVIDIA GPU PC에 **ComfyUI 설치와 모델**이 필요합니다.
+> - Flux.2 Klein(기본): [Flux.2 모델 준비](docs/flux2-remote-inference.md#2-2-flux2-klein-모델-준비)
+> - SDXL Turbo: [설치 가이드](docs/README.md#1-comfyui-설치와-모델-다운로드) (`WORKFLOW_PATH=./static/test.json`으로 실행하고 `update_prompts`의 노드 번호도 바꿔야 합니다)
 
 ```bash
 git clone <이 저장소 URL>
@@ -155,6 +187,15 @@ Docker 없이 실행하거나 VM 서버에 배포하는 방법은 [docs/README.m
 
 <br>
 
+## 문서
+
+| 문서 | 내용 |
+| --- | --- |
+| [docs/README.md](docs/README.md) | ComfyUI 설치, 모델 다운로드, Docker 실행, VM 배포, 문제 해결 |
+| [docs/flux2-remote-inference.md](docs/flux2-remote-inference.md) | 원격 ComfyUI 서버 연동, Flux.2 워크플로 분석과 코드 수정 과정 |
+
+<br>
+
 ## 프로젝트 구조
 
 ```
@@ -163,9 +204,13 @@ comfyui/
 ├── templates/
 │   └── image.html        # UI (입력 폼 + 결과 화면)
 ├── static/
+│   ├── flux2.json        # ComfyUI 워크플로 (API 형식, Flux.2 Klein 4B) ← 현재 기본
 │   └── test.json         # ComfyUI 워크플로 (API 형식, SDXL Turbo)
 ├── docs/
-│   └── README.md         # 설치·배포 가이드 (ComfyUI, Docker, VM)
+│   ├── README.md                   # 설치·배포 가이드 (ComfyUI, Docker, VM)
+│   ├── flux2-remote-inference.md   # 원격 추론 서버 + Flux.2 적용 과정
+│   └── images/
+│       └── screenshot.png
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
@@ -175,6 +220,8 @@ comfyui/
 
 ## 개선 계획
 
+- [ ] 워크플로별 노드 설정(`NODE_MAP`)으로 코드 수정 없이 Flux.2 ↔ SDXL Turbo 전환
+- [ ] 폴링 제한 시간 연장(60초 → 300초), 큐 대기 상태 표시
 - [ ] 생성 요청을 비동기(AJAX)로 바꿔 페이지 새로고침 없이 결과 표시
 - [ ] Flask가 이미지를 대신 전달하는 프록시 라우트로 ComfyUI 주소를 브라우저에 노출하지 않기
 - [ ] 이미지 크기, 스텝 수, 시드 등 옵션을 UI에서 조정
