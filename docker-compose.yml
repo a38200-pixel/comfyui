@@ -1,0 +1,20 @@
+services:
+  web:
+    build: .
+    container_name: comfyui-flask
+    ports:
+      - "5000:5000"            # 호스트포트:컨테이너포트 → 브라우저에서 http://localhost:5000
+    environment:
+      # ⚠️ 본인 PC(ComfyUI를 실행하는 PC)의 IP 주소로 바꾸세요.
+      #    Windows: cmd에서 `ipconfig` → IPv4 주소 / Linux·Mac: `ip addr` 또는 `ifconfig`
+      #
+      # Flask(컨테이너) → ComfyUI API 호출 주소
+      #   같은 PC에서 ComfyUI를 실행한다면 host.docker.internal 그대로 사용해도 됩니다.
+      COMFY_URL: "http://host.docker.internal:8188"
+      # 브라우저 → 결과 이미지 주소 (브라우저에서 열리는 주소여야 함)
+      #   같은 PC에서 접속한다면 127.0.0.1, 다른 기기에서 접속한다면 본인 PC IP (예: http://192.168.0.10:8188)
+      PUBLIC_COMFY_URL: "http://127.0.0.1:8188"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Linux Docker에서도 host.docker.internal 사용 가능하도록
+    volumes:
+      - .:/app                 # 코드 수정 시 컨테이너 재빌드 없이 바로 반영 (debug 모드 자동 재시작)
