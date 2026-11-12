@@ -26,6 +26,21 @@
 이 앱은 이미지를 직접 생성하지 않고, **ComfyUI 서버에 워크플로를 보내서** 결과를 받아옵니다.
 그래서 NVIDIA GPU가 있는 PC에 ComfyUI를 먼저 설치하고 실행해야 합니다.
 
+### 테스트한 환경
+
+아래 버전에서 동작을 확인했습니다. 다른 버전에서도 대부분 동작하지만, ComfyUI API가 바뀌어 문제가 생기면 이 버전을 기준으로 비교하세요.
+
+| 항목 | 버전 |
+| --- | --- |
+| ComfyUI | 0.45.0 |
+| ComfyUI Frontend | 1.59.1 |
+| PyTorch | 2.15.0 + CUDA 13.2 (`cu132`) |
+| Python (ComfyUI) | 3.13 |
+| GPU | NVIDIA GeForce RTX 3080 (10GB) |
+| 모델 | `sd_xl_turbo_1.0_fp16.safetensors` |
+
+> 실행 중인 ComfyUI의 버전은 브라우저에서 `http://<PC_IP>:8188/system_stats`를 열면 `comfyui_version` 항목으로 확인할 수 있습니다.
+
 ### 1-1. ComfyUI 설치
 
 **방법 A: Windows 포터블 버전 (가장 쉬움)**

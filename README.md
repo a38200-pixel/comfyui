@@ -71,6 +71,8 @@ sequenceDiagram
 | Frontend | HTML, CSS, Vanilla JS (Jinja2 템플릿, 외부 라이브러리 없음) |
 | Infra | Docker, Docker Compose, VMware (Linux VM), SSH / scp |
 
+**테스트 환경**: ComfyUI 0.45.0 · PyTorch 2.15.0 (CUDA 13.2) · NVIDIA RTX 3080 10GB · Flask 3.1.3 · Python 3.12 ([상세](docs/README.md#테스트한-환경))
+
 <br>
 
 ## 핵심 구현
@@ -119,14 +121,10 @@ while time.time() < end:
 - **해결**: 서버가 쓰는 주소(`COMFY_URL`)와 브라우저가 쓰는 주소(`PUBLIC_COMFY_URL`)를 분리했습니다.
 - **배운 점**: 같은 URL이라도 **어디에서 요청하느냐**에 따라 접근 가능 여부가 달라진다는 것을 알게 됐습니다.
 
-### 폴링이 1초 간격으로 동작하지 않음
-
-- **원인**: `time.sleep()`이 `while` 루프 밖에 들여쓰기되어 있어서, 대기 없이 요청을 계속 보내는 busy loop가 됐습니다.
-- **해결**: `sleep`을 루프 안으로 옮겨 1초 간격으로 조회하도록 수정했습니다.
 
 ### 같은 프롬프트로 생성하면 항상 같은 이미지
 
-- **원인**: 워크플로 JSON의 `noise_seed`가 고정값(7000)으로 저장되어 있었습니다. 또 ComfyUI는 입력이 같으면 캐시된 결과를 재사용합니다.
+- **원인**: 워크플로 JSON의 `noise_seed`가 고정값으로 저장되어 있었습니다. 또 ComfyUI는 입력이 같으면 캐시된 결과를 재사용합니다.
 - **해결**: 요청마다 `random.randint()`로 시드를 바꾸도록 했습니다.
 
 ### 다른 PC에서 clone하면 실행되지 않음
