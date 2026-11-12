@@ -7,7 +7,7 @@
 3. [VM 서버에 배포하기](#3-vm-서버에-배포하기) (UI 수정 → scp 업데이트 → 실행 → 웹 확인)
 4. [문제 해결](#4-문제-해결)
 
-> 다른 PC의 ComfyUI를 원격 추론 서버로 쓰고 Flux.2 워크플로로 생성하는 과정은 [flux2-remote-inference.md](flux2-remote-inference.md)에 따로 정리했습니다.
+> 다른 PC의 ComfyUI를 원격 추론 서버로 쓸 수 있는지 Flux.2 워크플로로 테스트한 과정은 [flux2-remote-inference.md](flux2-remote-inference.md)에 따로 정리했습니다.
 
 ## 내 환경 값 정리
 

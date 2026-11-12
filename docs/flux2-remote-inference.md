@@ -1,9 +1,15 @@
-# 원격 ComfyUI 서버로 Flux.2 이미지 생성하기
+# 원격 추론 테스트: 다른 PC의 ComfyUI로 Flux.2 이미지 생성
 
-다른 PC에서 돌아가는 ComfyUI를 **원격 추론 서버**로 쓰고, 그 서버에서 받은 **Flux.2 Klein 워크플로(`flux2.json`)**로 이미지를 생성하도록 앱을 바꾼 과정을 기록한 문서입니다.
+이 웹 앱이 **다른 PC에서 돌아가는 ComfyUI도 추론 서버로 쓸 수 있는지** 확인하기 위해 진행한 테스트 기록입니다.
+원격 PC의 ComfyUI에서 **Flux.2 Klein 워크플로(`flux2.json`)**를 받아와 앱에 연결하고, 실제로 이미지가 생성되는 것까지 확인했습니다.
 
-- 기존: 같은 네트워크의 ComfyUI + SDXL Turbo 워크플로(`static/test.json`)
-- 변경: 다른 PC의 ComfyUI + Flux.2 Klein 4B 워크플로(`static/flux2.json`)
+| 구분 | 워크플로 | ComfyUI |
+| --- | --- | --- |
+| 기본 (저장소 기본값) | SDXL Turbo (`static/test.json`) | 같은 네트워크의 GPU PC |
+| **이번 테스트** | Flux.2 Klein 4B (`static/flux2.json`) | **다른 PC의 원격 ComfyUI** |
+
+> 테스트 결과: 원격 ComfyUI에서 Flux.2 이미지 생성 성공 (RTX 3080 기준 장당 약 35초).
+> 저장소의 기본 코드는 SDXL Turbo 기준이며, Flux.2 코드는 `app2.py`에 주석으로 남겨 두었습니다. 다시 테스트하는 방법은 [5장](#5-코드-수정)을 참고하세요.
 
 ## 목차
 
@@ -161,18 +167,20 @@ for k, v in g.items():
 
 ## 5. 코드 수정
 
-`app2.py`에서 세 곳을 바꿨습니다.
+테스트할 때 `app2.py`에서 세 곳을 바꿨습니다.
+지금 저장소의 `app2.py`는 기본값인 SDXL Turbo 코드가 활성화되어 있고, Flux.2용 코드는 `'''` 주석 안에 남아 있습니다.
+
+**Flux.2로 다시 테스트하려면** `app2.py`에서 다음 두 곳을 바꿉니다.
+
+1. `WORKFLOW_PATH`: `test.json` 줄을 주석 처리하고, `'''` 안의 `flux2.json` 줄을 꺼냅니다.
+2. `update_prompts`: SDXL용 함수를 주석 처리하고, `'''` 안의 Flux.2용 함수를 꺼냅니다.
+
+> `WORKFLOW_PATH` 환경 변수만 `flux2.json`으로 바꾸면 안 됩니다. `update_prompts`가 SDXL 노드 번호(`13`)를 찾다가 `KeyError`가 납니다. 두 곳을 **함께** 바꿔야 합니다.
 
 ### 5-1. 워크플로 경로
 
 ```python
 WORKFLOW_PATH = os.getenv("WORKFLOW_PATH", "./static/flux2.json")
-```
-
-코드를 고치지 않고 환경 변수로도 바꿀 수 있습니다.
-
-```bash
-export WORKFLOW_PATH="./static/flux2.json"
 ```
 
 ### 5-2. 프롬프트와 시드를 넣는 노드
@@ -297,10 +305,11 @@ python app2.py
 
 테스트 환경: ComfyUI 0.45.0 · PyTorch 2.15.0 (CUDA 13.2) · NVIDIA RTX 3080 10GB
 
-### 워크플로를 다시 SDXL Turbo로 돌리려면
+### 테스트 후 SDXL Turbo로 되돌리기
 
-`WORKFLOW_PATH`를 `./static/test.json`으로 바꾸고, `update_prompts`도 변경 전 코드로 되돌려야 합니다.
-두 워크플로를 자주 오간다면 워크플로 파일 이름별로 노드 정보를 정해 두고 자동으로 고르게 하는 방법이 편합니다.
+테스트를 마친 뒤 `WORKFLOW_PATH`를 `./static/test.json`으로, `update_prompts`를 SDXL용 코드로 되돌렸습니다. 이것이 지금 저장소의 기본 상태입니다.
+
+두 워크플로를 자주 오가야 한다면, 워크플로 파일 이름별로 노드 정보를 정해 두고 자동으로 고르게 하는 방법이 편합니다(개선 과제).
 
 ```python
 NODE_MAP = {

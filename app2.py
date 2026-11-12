@@ -3,19 +3,25 @@ from flask import Flask, request, render_template
 import requests, json, time, os, random
 
 # ---------- 환경 설정 ----------
-# ⚠️ 아래 주소는 환경 변수로 설정합니다. (docker-compose.yml 의 environment 또는 셸에서 export)
+#  아래 주소는 환경 변수로 설정합니다. (docker-compose.yml 의 environment 또는 셸에서 export)
 #    환경 변수가 없으면 기본값이 사용되므로, 기본값을 "본인 PC의 IP 주소"로 바꿔서 사용하세요.
 #    예) ComfyUI를 192.168.0.10 PC에서 실행 중이라면 → "http://192.168.0.10:8188"
 
 # Flask 서버가 ComfyUI API(/prompt, /history)를 호출할 때 쓰는 주소
-COMFY_URL = os.getenv("COMFY_URL", "http://127.0.0.1:8188")  # ← 본인 PC(ComfyUI 실행 PC) IP로 변경
 
+COMFY_URL = os.getenv("COMFY_URL", "http://127.0.0.1:8188")  # ← 본인 PC(ComfyUI 실행 PC) IP로 변경
+'''
+COMFY_URL = os.getenv("COMFY_URL", "http://-----------") #다른 PC의 Comfy UI추론 실행 테스트 확인용
+'''
 # 브라우저가 결과 이미지(/view)를 직접 불러올 때 쓰는 주소
 #   - 브라우저에서 열리는 주소여야 합니다. (컨테이너 전용 주소 host.docker.internal 은 사용 불가)
 #   - 설정하지 않으면 COMFY_URL 과 같은 값을 사용합니다.
 PUBLIC_COMFY_URL = os.getenv("PUBLIC_COMFY_URL", COMFY_URL)  # ← 본인 PC IP로 변경
 
 WORKFLOW_PATH = os.getenv("WORKFLOW_PATH", "./static/test.json")  # ComfyUI 워크플로(API 형식) JSON 경로
+'''
+WORKFLOW_PATH = os.getenv("WORKFLOW_PATH", "./static/flux2.json")
+'''
 PORT = int(os.getenv("PORT", "5000"))  # Flask 포트
 
 app = Flask(__name__)
@@ -34,6 +40,14 @@ def update_prompts(graph: dict, pos: str, neg: str,
     graph[pos_node_id]["inputs"]["text"] = pos
     graph[neg_node_id]["inputs"]["text"] = neg
     return graph
+'''
+def update_prompts(graph: dict, pos: str, neg: str,
+                    pos_node_id: str = "76", neg_node_id: str = "75:67") -> dict:
+    graph["75:73"]["inputs"]["noise_seed"] = random.randint(0, 2**32 - 1) # 시드 랜덤화
+    graph[pos_node_id]["inputs"]["value"] = pos   # PrimitiveStringMultiline 은 "value"
+    graph[neg_node_id]["inputs"]["text"] = neg
+    return graph
+'''
 
 def submit_prompt(graph: dict) -> str:
     # ComfyUI /prompt 에 워크플로 제출 후 prompt_id 반환
@@ -83,7 +97,6 @@ def index():
         prompt_id = submit_prompt(graph)
         history_block = poll_history(prompt_id)
         img_url = extract_first_image_url(history_block)
-
     return render_template("image.html", pos=pos, neg=neg, img_url=img_url)
 
 if __name__ == "__main__":
