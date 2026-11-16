@@ -29,8 +29,8 @@ ComfyUI는 강력하지만 노드 그래프 화면이 복잡해서 처음 쓰는
 | 분류 | 사용 기술 |
 | --- | --- |
 | Backend | Python 3.12, Flask, requests |
-| AI / 이미지 생성 | ComfyUI, Stable Diffusion XL Turbo (원격 추론 테스트: Flux.2 Klein 4B) |
-| Frontend | HTML, CSS, Vanilla JS (Jinja2 템플릿, 외부 라이브러리 없음) |
+| AI / 이미지 생성 | ComfyUI, Stable Diffusion XL Turbo |
+| Frontend | HTML, CSS, Vanilla JS |
 | Infra | Docker, Docker Compose, VMware (Linux VM), SSH / scp |
 
 **테스트 환경**: ComfyUI 0.45.0 · PyTorch 2.15.0 (CUDA 13.2) · NVIDIA RTX 3080 10GB · Flask 3.1.3 · Python 3.12 ([상세](docs/README.md#테스트한-환경))
