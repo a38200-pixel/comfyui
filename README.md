@@ -11,7 +11,7 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 목적 | ComfyUI의 노드 기반 워크플로를 **누구나 쓸 수 있는 웹 UI**로 감싸기 |
+| 목적 | ComfyUI의 노드 기반 워크플로를 **누구나 쓸 수 있는 웹 UI**로 만들기 |
 | 기능 | Positive/Negative 프롬프트 입력 → 이미지 생성 → 결과 표시 |
 | 모델 | **SDXL Turbo** (`sd_xl_turbo_1.0_fp16`, 512×512, 1스텝) |
 | 원격 추론 테스트 | 다른 PC의 ComfyUI에서 **Flux.2 Klein 4B** 워크플로(`flux2.json`)로 추론되는지 검증 |
@@ -24,13 +24,25 @@ ComfyUI는 강력하지만 노드 그래프 화면이 복잡해서 처음 쓰는
 
 <br>
 
+## 기술 스택
+
+| 분류 | 사용 기술 |
+| --- | --- |
+| Backend | Python 3.12, Flask, requests |
+| AI / 이미지 생성 | ComfyUI, Stable Diffusion XL Turbo (원격 추론 테스트: Flux.2 Klein 4B) |
+| Frontend | HTML, CSS, Vanilla JS (Jinja2 템플릿, 외부 라이브러리 없음) |
+| Infra | Docker, Docker Compose, VMware (Linux VM), SSH / scp |
+
+**테스트 환경**: ComfyUI 0.45.0 · PyTorch 2.15.0 (CUDA 13.2) · NVIDIA RTX 3080 10GB · Flask 3.1.3 · Python 3.12 ([상세](docs/README.md#테스트한-환경))
+
+<br>
+
 ## 주요 기능
 
 - **텍스트 → 이미지 생성**: Positive / Negative 프롬프트로 이미지 생성
 - **원격 추론 서버 연동**: `COMFY_URL`만 바꾸면 같은 네트워크의 다른 GPU PC에서 돌아가는 ComfyUI로 생성 요청 (Flux.2 워크플로로 검증)
 - **매번 다른 결과**: 요청마다 시드를 랜덤으로 바꿔 같은 프롬프트로도 새로운 이미지 생성
 - **생성 상태 표시**: 생성 중에는 버튼 비활성화, 스피너, 결과 영역 애니메이션
-- **다크 UI**: 다크 베이스에 네온 그린 포인트, 모바일 반응형 레이아웃
 - **환경 변수 설정**: ComfyUI 주소를 코드 수정 없이 환경 변수로 변경
 - **Docker 지원**: `docker compose up` 한 줄로 실행 환경 구성
 
@@ -63,19 +75,6 @@ sequenceDiagram
 | **ComfyUI** | 실제 이미지 생성 (원격 PC의 GPU) |
 | **워크플로** (`static/test.json`) | ComfyUI에서 설계한 노드 그래프 (API 형식). `static/flux2.json`은 원격 추론 테스트용 |
 | **템플릿** (`templates/image.html`) | 입력 폼과 결과 화면 |
-
-<br>
-
-## 기술 스택
-
-| 분류 | 사용 기술 |
-| --- | --- |
-| Backend | Python 3.12, Flask, requests |
-| AI / 이미지 생성 | ComfyUI, Stable Diffusion XL Turbo (원격 추론 테스트: Flux.2 Klein 4B) |
-| Frontend | HTML, CSS, Vanilla JS (Jinja2 템플릿, 외부 라이브러리 없음) |
-| Infra | Docker, Docker Compose, VMware (Linux VM), SSH / scp |
-
-**테스트 환경**: ComfyUI 0.45.0 · PyTorch 2.15.0 (CUDA 13.2) · NVIDIA RTX 3080 10GB · Flask 3.1.3 · Python 3.12 ([상세](docs/README.md#테스트한-환경))
 
 <br>
 
